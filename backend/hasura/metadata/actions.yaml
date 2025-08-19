@@ -8,7 +8,7 @@ actions:
         - name: content
           type: String!
       output_type: MessageResponse
-      handler: https://<your-n8n-host>/webhook/send-message
+      handler: https://my-n8n-app.com/webhook/send-message
       forward_client_headers: true
 custom_types:
   enums: []
