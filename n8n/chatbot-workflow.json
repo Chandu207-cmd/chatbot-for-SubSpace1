@@ -1,0 +1,269 @@
+{
+  "name": "Hasura Action sendMessage \u2192 OpenRouter \u2192 Save Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-message"
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "={{$env.N8N_HASURA_GRAPHQL_URL}}",
+        "jsonParameters": true,
+        "headerParametersJson": "={\"x-hasura-admin-secret\":\"{{$env.N8N_HASURA_ADMIN_SECRET}}\"}",
+        "bodyParametersJson": "={\n  \"query\": \"query ($chat_id: uuid!) { chats_by_pk(id: $chat_id) { id user_id } }\",\n  \"variables\": { \"chat_id\": \"{{$json.body.input.chat_id}}\" }\n}"
+      },
+      "id": "CheckChatOwnership",
+      "name": "Check Chat Ownership",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        580,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnce",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{$json.data.chats_by_pk.user_id}}",
+                    "operation": "equal",
+                    "value2": "={{$json.headers['x-hasura-user-id'] || $json.headers['X-Hasura-User-Id']}}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "IfOwner",
+      "name": "IF owner?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        840,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "statusCode": 403,
+        "responseBody": "={ { error: 'Forbidden: not your chat' } }"
+      },
+      "id": "Forbidden",
+      "name": "Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        840,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "={{$env.N8N_HASURA_GRAPHQL_URL}}",
+        "jsonParameters": true,
+        "headerParametersJson": "={\"x-hasura-admin-secret\":\"{{$env.N8N_HASURA_ADMIN_SECRET}}\"}",
+        "bodyParametersJson": "={\n  \"query\": \"mutation ($chat_id: uuid!, $content: String!) { insert_messages_one(object: {chat_id: $chat_id, sender: \\\"user\\\", content: $content}) { id chat_id sender content created_at } }\",\n  \"variables\": { \"chat_id\": \"{{$json.body.input.chat_id}}\", \"content\": \"{{$json.body.input.content}}\" }\n}"
+      },
+      "id": "InsertUserMessage",
+      "name": "Insert User Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1090,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "jsonParameters": true,
+        "headerParametersJson": "={\n  \"Authorization\": \"Bearer {{$env.N8N_OPENROUTER_API_KEY}}\",\n  \"HTTP-Referer\": \"https://yourapp.example\",\n  \"X-Title\": \"Nhost Chatbot\"\n}",
+        "bodyParametersJson": "={\n  \"model\": \"{{$env.N8N_OPENROUTER_MODEL}}\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"You are a concise helpful assistant inside a chat app.\"},\n    {\"role\": \"user\",   \"content\": \"{{$node.\\\"Insert User Message\\\".json.data.insert_messages_one.content}}\"}\n  ]\n}"
+      },
+      "id": "CallOpenRouter",
+      "name": "Call OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1090,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const c = $json.choices?.[0]?.message?.content || '...'; return [{ content: c }];"
+      },
+      "id": "ExtractAIContent",
+      "name": "Extract AI Content",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1310,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "={{$env.N8N_HASURA_GRAPHQL_URL}}",
+        "jsonParameters": true,
+        "headerParametersJson": "={\"x-hasura-admin-secret\":\"{{$env.N8N_HASURA_ADMIN_SECRET}}\"}",
+        "bodyParametersJson": "={\n  \"query\": \"mutation ($chat_id: uuid!, $content: String!) { insert_messages_one(object: {chat_id: $chat_id, sender: \\\"bot\\\", content: $content}) { id chat_id sender content created_at } }\",\n  \"variables\": { \"chat_id\": \"{{$json.body.input.chat_id}}\", \"content\": \"{{$json.content}}\" }\n}"
+      },
+      "id": "InsertBotMessage",
+      "name": "Insert Bot Message",
+      "typeVersion": 4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1530,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const m=$json.data.insert_messages_one; return [{id:m.id, chat_id:m.chat_id, sender:m.sender, content:m.content, created_at:m.created_at}];"
+      },
+      "id": "BuildActionResponse",
+      "name": "Build Action Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      },
+      "id": "ReturnToHasura",
+      "name": "Return to Hasura",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1970,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Chat Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Chat Ownership": {
+      "main": [
+        [
+          {
+            "node": "IF owner?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF owner?": {
+      "main": [
+        [
+          {
+            "node": "Insert User Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert User Message": {
+      "main": [
+        [
+          {
+            "node": "Call OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Content": {
+      "main": [
+        [
+          {
+            "node": "Insert Bot Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Bot Message": {
+      "main": [
+        [
+          {
+            "node": "Build Action Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Action Response": {
+      "main": [
+        [
+          {
+            "node": "Return to Hasura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
