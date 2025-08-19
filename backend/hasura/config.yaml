@@ -1,4 +1,14 @@
 version: 3
 metadata_directory: metadata
 actions:
-  kind: synchronous
+  - name: sendMessage
+    definition:
+      kind: synchronous
+      arguments:
+        - name: chat_id
+          type: uuid!
+        - name: content
+          type: String!
+      output_type: MessageResponse
+      handler: https://my-n8n-app.com/webhook/send-message
+      forward_client_headers: true
