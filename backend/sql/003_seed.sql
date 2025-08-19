@@ -1,0 +1,2 @@
+-- Optional seed
+-- INSERT INTO public.chats (user_id, title) VALUES ('00000000-0000-0000-0000-000000000000','Sample Chat');
