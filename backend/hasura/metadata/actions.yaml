@@ -1,0 +1,29 @@
+actions:
+  - name: sendMessage
+    definition:
+      kind: synchronous
+      arguments:
+        - name: chat_id
+          type: uuid!
+        - name: content
+          type: String!
+      output_type: MessageResponse
+      handler: https://<your-n8n-host>/webhook/send-message
+      forward_client_headers: true
+custom_types:
+  enums: []
+  input_objects: []
+  objects:
+    - name: MessageResponse
+      fields:
+        - name: id
+          type: uuid!
+        - name: chat_id
+          type: uuid!
+        - name: sender
+          type: String!
+        - name: content
+          type: String!
+        - name: created_at
+          type: timestamptz!
+  scalars: []
