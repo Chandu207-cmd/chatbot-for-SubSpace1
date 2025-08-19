@@ -17,7 +17,7 @@ tables:
             user_id:
               _eq: X-Hasura-User-Id
           set:
-            user_id: x-hasura-user-id
+  user_id: X-Hasura-User-Id
     update_permissions:
       - role: user
         permission:
